@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import pickle
 import numpy as np
 import os
+
 from training_validation_sets import get_training_validation_and_testing_sets
 
 def build_model(input_shape):
@@ -73,6 +74,24 @@ def evaluate_model(model, X_test, y_test):
     test_loss, test_mae = model.evaluate(X_test, y_test)
     print(f'Test Loss: {test_loss}')
     print(f'Test MAE: {test_mae}')
+
+    # Predict values using the trained model
+    y_pred = model.predict(X_test)
+
+    # Plot actual vs predicted values
+    plt.figure(figsize=(14, 6))
+    for i in range(3):
+        plt.subplot(1, 3, i+1)
+        plt.plot(y_test[:, i], label='Actual')
+        plt.plot(y_pred[:, i], label='Predicted')
+        plt.xlabel('Sample Index')
+        plt.ylabel(f'Output {i+1}')
+        plt.title(f'Actual vs Predicted for Output {i+1}')
+        plt.legend()
+    
+    plt.tight_layout()
+    plt.savefig('actual_vs_predicted.png')
+    plt.close()
 
 if __name__ == "__main__":
     # Load data samples
