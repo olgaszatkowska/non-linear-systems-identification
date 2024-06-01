@@ -12,16 +12,19 @@ def build_model(input_shape):
     model = Sequential([
         Flatten(input_shape=input_shape),
         Dense(128, activation='relu'),
+        Dropout(0.5),  # Dodanie Dropout dla regularizacji
         Dense(64, activation='relu'),
+        Dropout(0.5),  # Dodanie Dropout dla regularizacji
         Dense(3)  # Output layer for regression task
     ])
     return model
+
 
 def train_model(X_train, y_train, X_val, y_val):
     model = build_model(input_shape=X_train[0].shape)
     model.compile(optimizer='adam',
                   loss='mean_squared_error',
-                  metrics=['mae'])  # Mean Absolute Error
+                  metrics=['mae', 'mape'])  # Mean Absolute Error and Mean Absolute Percentage Error
 
     # Add EarlyStopping callback
     early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
@@ -30,17 +33,36 @@ def train_model(X_train, y_train, X_val, y_val):
                         validation_data=(X_val, y_val),
                         epochs=200, batch_size=32,
                         callbacks=[early_stopping])
-    
-    plt.plot(history.history['loss'], label='Training Loss')
-    plt.plot(history.history['val_loss'], label='Validation Loss')
+
+    plt.figure(figsize=(12, 8))
+    plt.subplot(3, 1, 1)
+    plt.plot(history.history['loss'], label='Training MSE Loss')
+    plt.plot(history.history['val_loss'], label='Validation MSE Loss')
     plt.xlabel('Epochs')
-    plt.ylabel('Loss')
+    plt.ylabel('MSE Loss')
     plt.legend()
-    plt.savefig('training_validation_loss.png')
+
+    plt.subplot(3, 1, 2)
+    plt.plot(history.history['mae'], label='Training MAE')
+    plt.plot(history.history['val_mae'], label='Validation MAE')
+    plt.xlabel('Epochs')
+    plt.ylabel('MAE')
+    plt.legend()
+
+    plt.subplot(3, 1, 3)
+    plt.plot(history.history['mape'], label='Training MAPE')
+    plt.plot(history.history['val_mape'], label='Validation MAPE')
+    plt.xlabel('Epochs')
+    plt.ylabel('MAPE')
+    plt.legend()
+
+    plt.tight_layout()
+    plt.savefig('training_validation_metrics.png')
     plt.close()
 
     # Return the trained model and its history
     return model, history
+
 
 def plot_data_samples(X_train, y_train, X_val, y_val, X_test, y_test):
     def plot_samples(X, y, title, filename):
@@ -70,10 +92,12 @@ def plot_data_samples(X_train, y_train, X_val, y_val, X_test, y_test):
     plot_samples(X_val, y_val, "Validation Data", "validation_data.png")
     plot_samples(X_test, y_test, "Testing Data", "testing_data.png")
 
+
 def evaluate_model(model, X_test, y_test):
-    test_loss, test_mae = model.evaluate(X_test, y_test)
-    print(f'Test Loss: {test_loss}')
+    test_loss, test_mae, test_mape = model.evaluate(X_test, y_test)
+    print(f'Test MSE Loss: {test_loss}')
     print(f'Test MAE: {test_mae}')
+    print(f'Test MAPE: {test_mape}')
 
     # Predict values using the trained model
     y_pred = model.predict(X_test)
@@ -81,17 +105,18 @@ def evaluate_model(model, X_test, y_test):
     # Plot actual vs predicted values
     plt.figure(figsize=(14, 6))
     for i in range(3):
-        plt.subplot(1, 3, i+1)
+        plt.subplot(1, 3, i + 1)
         plt.plot(y_test[:, i], label='Actual')
         plt.plot(y_pred[:, i], label='Predicted')
         plt.xlabel('Sample Index')
-        plt.ylabel(f'Output {i+1}')
-        plt.title(f'Actual vs Predicted for Output {i+1}')
+        plt.ylabel(f'Output {i + 1}')
+        plt.title(f'Actual vs Predicted for Output {i + 1}')
         plt.legend()
-    
+
     plt.tight_layout()
     plt.savefig('actual_vs_predicted.png')
     plt.close()
+
 
 if __name__ == "__main__":
     # Load data samples
@@ -106,7 +131,7 @@ if __name__ == "__main__":
         sets_scaled = pickle.load(file)
 
     X_train, y_train, X_val, y_val, X_test, y_test = sets
-    
+
     # Convert data to float32
     X_train = np.array(X_train).astype('float32')
     y_train = np.array(y_train).astype('float32')
@@ -114,7 +139,7 @@ if __name__ == "__main__":
     y_val = np.array(y_val).astype('float32')
     X_test = np.array(X_test).astype('float32')
     y_test = np.array(y_test).astype('float32')
-    
+
     print(X_train.shape, y_train.shape)
 
     # Plot data samples
