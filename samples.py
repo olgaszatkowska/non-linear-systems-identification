@@ -39,9 +39,10 @@ class DataSample:
     @property
     def y(self) -> NDArray:
         return np.array([self.acceleration_1, self.acceleration_2, self.acceleration_3])
-      
+
+
 class LineToDataSampleError(Exception):
-  pass
+    pass
 
 
 def determine_stimulation_type(file_name: str) -> StimulationType:
@@ -59,16 +60,16 @@ def _csv_line_to_data_sample(
     line: list[str], stimulation_type: StimulationType
 ) -> DataSample:
     if "Force" in line:
-      raise LineToDataSampleError("Detected header row, skipping")
-    
+        raise LineToDataSampleError("Detected header row, skipping")
+
     if len(line) == 0:
         raise LineToDataSampleError("Invalid line")
 
     data_as_floats = [float(measurement) for measurement in line[:5]]
 
     return DataSample(
-      *data_as_floats,
-      stimulation_type=stimulation_type,
+        *data_as_floats,
+        stimulation_type=stimulation_type,
     )
 
 
@@ -81,33 +82,31 @@ def _csv_file_to_data_samples(
         filepath = os.path.join(FOLDER_PATH, data_set_filename)
 
         if "csv" not in data_set_filename:
-          continue
+            continue
 
         file_stimulation_type = determine_stimulation_type(data_set_filename)
-        
+
         if stimulation_type == StimulationType.MULTISINE_RANDOM_FREQUENCY_GRID:
-          continue
+            continue
 
         if stimulation_type != None and stimulation_type != file_stimulation_type:
-          continue
+            continue
 
         with open(filepath, newline="") as data_set_file:
             reader = csv.reader(data_set_file)
 
             for row in reader:
-              try:
-                data_sample = _csv_line_to_data_sample(row, file_stimulation_type)
-                data_samples.append(data_sample)
-              except LineToDataSampleError:
-                continue
-          
+                try:
+                    data_sample = _csv_line_to_data_sample(row, file_stimulation_type)
+                    data_samples.append(data_sample)
+                except LineToDataSampleError:
+                    continue
 
     return data_samples
 
 
 def get_data_samples(stimulation_type: StimulationType = None) -> list[DataSample]:
     if stimulation_type == StimulationType.MULTISINE_RANDOM_FREQUENCY_GRID:
-      raise Exception("Not supported stimulation type")
+        raise Exception("Not supported stimulation type")
 
     return _csv_file_to_data_samples(stimulation_type)
-
