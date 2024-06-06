@@ -8,14 +8,28 @@ import os
 
 from training_validation_sets import get_training_validation_and_testing_sets
 
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import Dense, Dropout, Flatten
+
 def build_model(input_shape):
     model = Sequential([
         Flatten(input_shape=input_shape),
-        Dense(128, activation='relu'),
-        Dropout(0.5),  # Dodanie Dropout dla regularizacji
-        Dense(64, activation='relu'),
-        Dropout(0.5),  # Dodanie Dropout dla regularizacji
-        Dense(3)  # Output layer for regression task
+        Dense(2048, activation='relu'),  
+        Dropout(0.2),  
+        Dense(1024, activation='relu'), 
+        Dropout(0.2), 
+        
+        # Dodanie dodatkowych warstw
+        Dense(512, activation='relu'),  
+        Dropout(0.2),  
+        
+        Dense(256, activation='relu'), 
+        Dropout(0.2),  
+
+        Dense(128, activation='relu'),  
+        Dropout(0.2),  
+
+        Dense(3) 
     ])
     return model
 
@@ -27,11 +41,11 @@ def train_model(X_train, y_train, X_val, y_val):
                   metrics=['mae', 'mape'])  # Mean Absolute Error and Mean Absolute Percentage Error
 
     # Add EarlyStopping callback
-    early_stopping = EarlyStopping(monitor='val_loss', patience=10, restore_best_weights=True)
+    early_stopping = EarlyStopping(monitor='val_loss', patience=100, restore_best_weights=True)
 
     history = model.fit(X_train, y_train,
                         validation_data=(X_val, y_val),
-                        epochs=200, batch_size=32,
+                        epochs=1000, batch_size=32,
                         callbacks=[early_stopping])
 
     plt.figure(figsize=(12, 8))
