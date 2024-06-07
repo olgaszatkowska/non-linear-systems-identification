@@ -1,6 +1,7 @@
 from tensorflow.keras.models import Sequential, load_model
-from tensorflow.keras.layers import Dense, Flatten
+from tensorflow.keras.layers import Dense, Flatten, Dropout
 from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.optimizers import Adam, Nadam, SGD, RMSprop, Adagrad
 import matplotlib.pyplot as plt
 import pickle
 import numpy as np
@@ -8,39 +9,42 @@ import os
 
 from training_validation_sets import get_training_validation_and_testing_sets
 
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import Dense, Dropout, Flatten
-
 def build_model(input_shape):
     model = Sequential([
         Flatten(input_shape=input_shape),
-        Dense(2048, activation='relu'),  
-        Dropout(0.2),  
         Dense(1024, activation='relu'), 
         Dropout(0.2), 
-        
-        # Dodanie dodatkowych warstw
         Dense(512, activation='relu'),  
         Dropout(0.2),  
-        
         Dense(256, activation='relu'), 
         Dropout(0.2),  
-
         Dense(128, activation='relu'),  
         Dropout(0.2),  
-
         Dense(3) 
     ])
     return model
 
+def get_optimizer(optimizer_name):
+    if optimizer_name == 'adam':
+        return Adam(learning_rate=0.001)
+    elif optimizer_name == 'nadam':
+        return Nadam(learning_rate=0.001)
+    elif optimizer_name == 'sgd':
+        return SGD(learning_rate=0.01)
+    elif optimizer_name == 'rmsprop':
+        return RMSprop(learning_rate=0.001)
+    elif optimizer_name == 'adagrad':
+        return Adagrad(learning_rate=0.01)
+    else:
+        raise ValueError(f"Unknown optimizer: {optimizer_name}")
 
-def train_model(X_train, y_train, X_val, y_val):
+def train_model(X_train, y_train, X_val, y_val, optimizer_name='adam'):
     model = build_model(input_shape=X_train[0].shape)
-    model.compile(optimizer='adam',
+    optimizer = get_optimizer(optimizer_name)
+    model.compile(optimizer=optimizer,
                   loss='mean_squared_error',
-                  metrics=['mae', 'mape'])  # Mean Absolute Error and Mean Absolute Percentage Error
+                  metrics=['mae'])
 
-    # Add EarlyStopping callback
     early_stopping = EarlyStopping(monitor='val_loss', patience=100, restore_best_weights=True)
 
     history = model.fit(X_train, y_train,
@@ -49,34 +53,31 @@ def train_model(X_train, y_train, X_val, y_val):
                         callbacks=[early_stopping])
 
     plt.figure(figsize=(12, 8))
-    plt.subplot(3, 1, 1)
-    plt.plot(history.history['loss'], label='Training MSE Loss')
-    plt.plot(history.history['val_loss'], label='Validation MSE Loss')
+    plt.subplot(2, 1, 1)
+    plt.plot(history.history['loss'], label=f'Training MSE Loss ({optimizer_name})')
+    plt.plot(history.history['val_loss'], label=f'Validation MSE Loss ({optimizer_name})')
     plt.xlabel('Epochs')
     plt.ylabel('MSE Loss')
     plt.legend()
 
-    plt.subplot(3, 1, 2)
-    plt.plot(history.history['mae'], label='Training MAE')
-    plt.plot(history.history['val_mae'], label='Validation MAE')
+    plt.subplot(2, 1, 2)
+    plt.plot(history.history['mae'], label=f'Training MAE ({optimizer_name})')
+    plt.plot(history.history['val_mae'], label=f'Validation MAE ({optimizer_name})')
     plt.xlabel('Epochs')
     plt.ylabel('MAE')
     plt.legend()
 
-    plt.subplot(3, 1, 3)
-    plt.plot(history.history['mape'], label='Training MAPE')
-    plt.plot(history.history['val_mape'], label='Validation MAPE')
-    plt.xlabel('Epochs')
-    plt.ylabel('MAPE')
-    plt.legend()
-
     plt.tight_layout()
-    plt.savefig('training_validation_metrics.png')
+    plt.savefig(f'{optimizer_name}/training_validation_metrics_{optimizer_name}.png')
     plt.close()
 
-    # Return the trained model and its history
-    return model, history
+    with open(f'{optimizer_name}/metrics_{optimizer_name}.txt', 'w') as f:
+        f.write(f"Training MSE Loss: {history.history['loss'][-1]}\n")
+        f.write(f"Validation MSE Loss: {history.history['val_loss'][-1]}\n")
+        f.write(f"Training MAE: {history.history['mae'][-1]}\n")
+        f.write(f"Validation MAE: {history.history['val_mae'][-1]}\n")
 
+    return model, history
 
 def plot_data_samples(X_train, y_train, X_val, y_val, X_test, y_test):
     def plot_samples(X, y, title, filename):
@@ -106,17 +107,17 @@ def plot_data_samples(X_train, y_train, X_val, y_val, X_test, y_test):
     plot_samples(X_val, y_val, "Validation Data", "validation_data.png")
     plot_samples(X_test, y_test, "Testing Data", "testing_data.png")
 
-
-def evaluate_model(model, X_test, y_test):
-    test_loss, test_mae, test_mape = model.evaluate(X_test, y_test)
+def evaluate_model(model, X_test, y_test, optimizer_name):
+    test_loss, test_mae = model.evaluate(X_test, y_test)
     print(f'Test MSE Loss: {test_loss}')
     print(f'Test MAE: {test_mae}')
-    print(f'Test MAPE: {test_mape}')
 
-    # Predict values using the trained model
+    with open(f'{optimizer_name}/test_metrics_{optimizer_name}.txt', 'w') as f:
+        f.write(f"Test MSE Loss: {test_loss}\n")
+        f.write(f"Test MAE: {test_mae}\n")
+
     y_pred = model.predict(X_test)
 
-    # Plot actual vs predicted values
     plt.figure(figsize=(14, 6))
     for i in range(3):
         plt.subplot(1, 3, i + 1)
@@ -124,20 +125,17 @@ def evaluate_model(model, X_test, y_test):
         plt.plot(y_pred[:, i], label='Predicted')
         plt.xlabel('Sample Index')
         plt.ylabel(f'Output {i + 1}')
-        plt.title(f'Actual vs Predicted for Output {i + 1}')
+        plt.title(f'Actual vs Predicted for Output {i + 1} ({optimizer_name})')
         plt.legend()
 
     plt.tight_layout()
-    plt.savefig('actual_vs_predicted.png')
+    plt.savefig(f'{optimizer_name}/actual_vs_predicted_{optimizer_name}.png')
     plt.close()
 
-
 if __name__ == "__main__":
-    # Load data samples
     with open("data_samples.pkl", "rb") as file:
         data_samples = pickle.load(file)
 
-    # Load training, validation, and test sets
     with open("sets.pkl", "rb") as file:
         sets = pickle.load(file)
 
@@ -146,7 +144,6 @@ if __name__ == "__main__":
 
     X_train, y_train, X_val, y_val, X_test, y_test = sets
 
-    # Convert data to float32
     X_train = np.array(X_train).astype('float32')
     y_train = np.array(y_train).astype('float32')
     X_val = np.array(X_val).astype('float32')
@@ -156,14 +153,18 @@ if __name__ == "__main__":
 
     print(X_train.shape, y_train.shape)
 
-    # Plot data samples
     plot_data_samples(X_train, y_train, X_val, y_val, X_test, y_test)
 
-    # Train the model
-    trained_model, training_history = train_model(X_train, y_train, X_val, y_val)
+    optimizers = ['adam', 'nadam', 'rmsprop', 'adagrad'] 
 
-    # Save the trained model
-    trained_model.save("trained_model.h5")
+    for optimizer_name in optimizers:
+        print(f"Training with optimizer: {optimizer_name}")
+        
+        if not os.path.exists(optimizer_name):
+            os.makedirs(optimizer_name)
 
-    # Evaluate the model on the test set
-    evaluate_model(trained_model, X_test, y_test)
+        trained_model, training_history = train_model(X_train, y_train, X_val, y_val, optimizer_name=optimizer_name)
+
+        trained_model.save(f"{optimizer_name}/trained_model_{optimizer_name}.h5")
+
+        evaluate_model(trained_model, X_test, y_test, optimizer_name=optimizer_name)
